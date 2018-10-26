@@ -1,6 +1,7 @@
 import React, {Component, PureComponent} from 'react';
 import { createBottomTabNavigator } from 'react-navigation';
 import { Button, AsyncStorage, StyleSheet, Text, TextInput, View, FlatList, Dimensions } from 'react-native';
+import moment from 'moment';
 
 const { width: vw } = Dimensions.get('window');
 const CARD_MARGIN = 15;
@@ -26,23 +27,51 @@ const styles = StyleSheet.create({
 class NewSharing extends Component {
     state = {
         text: '',
-        coords: []
+        latitude: null,
+        longitude: null,
+        error: ''
     };
 
-    //pour reset
-    /*componentDidMount(){
-        AsyncStorage.removeItem('toto').then(() => {
-            alert('fdkls');
-        });
-    }*/
+    componentDidMount(){
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                this.setState({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    error: null,
+                });
+            },
+            (error) => this.setState({ error: error.message }),
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+        );
+
+        //pour reset
+        /*AsyncStorage.removeItem('toto').then(() => {
+            alert('local storage vide');
+        });*/
+    }
 
     _storeData = async () => {
         try {
-            await AsyncStorage.getItem('toto', itemExistant => {
-                let items = JSON.parse(itemExistant);
-                items.push({
-                    'text': this.state.text
-                });
+            await AsyncStorage.getItem('toto', (err, result) => {
+                let items = JSON.parse(result);
+                let id = 0;
+
+                if(result === null){
+                    id = 1;
+                    items = [];
+                } else {
+                    id = items.length+1;
+                }
+
+                const message = {
+                    'id': id,
+                    'text': this.state.text,
+                    'latitude': this.state.latitude,
+                    'longitude': this.state.longitude,
+                    'datecreat': moment().format("YYYYMMDD")
+            };
+                items.push(message);
                 AsyncStorage.setItem('toto', JSON.stringify(items));
             });
         } catch (error) {
@@ -79,9 +108,9 @@ class ListHistoric extends Component {
         });
     }
 
-    refresh(){
+    refresh = () => {
         AsyncStorage.getItem('toto', (err, result) => {
-            this.setState({listHistoric: result});
+            this.setState({listHistoric: JSON.parse(result)});
         });
     }
 
@@ -107,17 +136,30 @@ class ListHistoric extends Component {
 }
 
 class UserInHistoric extends Component {
+    state = {
+        fromNow: ''
+    };
+
+    componentDidMount(){
+        console.log(this.props.content.datecreat);
+        this.setState({fromNow: moment(this.props.content.datecreat, "YYYYMMDD").fromNow()});
+    }
+
     render() {
         const { content } = this.props;
+        const { fromNow } = this.state;
+
         return (
             <View style={styles.container}>
-                <Text>{content}</Text>
+                <Text>{fromNow && fromNow}</Text>
+                <Text>User {content.id} : {content.text}</Text>
+                <Text>Position : {content.latitude}, {content.longitude}</Text>
             </View>
         );
     }
 }
 
-export default Navigator = ({
+export default Navigator = createBottomTabNavigator({
     New: NewSharing,
     Historic: ListHistoric,
 })
